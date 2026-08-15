@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+
+  # 1. Postgres
+  postgres:
+    image: postgres:16
+    container_name: url-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: urlpass
+      POSTGRES_DB: urldb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # persist data even if container restarts
+    networks:
+      - url-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  #  2. Redis
+  redis:
+    image: redis:7-alpine          # alpine = tiny image, same Redis
+    container_name: url-redis
+    networks:
+      - url-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Go App 
+  app:   #dokcer compose name actually we called it as a localhost:8080
+    build: .                       # build from Dockerfile in current directory
+    container_name: url-app
+    env_file: .env                 # load all .env vars into the container
+    depends_on:
+      postgres:
+        condition: service_healthy # wait for postgres to be ready before starting
+      redis:
+        condition: service_healthy # wait for redis to be ready before starting
+    networks:
+      - url-network
+    restart: on-failure            # auto restart if Go app crashes
+
+  # 4. Nginx 
+  nginx:
+    image: nginx:alpine
+    container_name: url-nginx
+    ports:
+      - "80:80"                    # expose port 80 to your machine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro   # mount our config into nginx
+    depends_on:
+      - app                        # wait for Go app before starting
+    networks:
+      - url-network
+
+# named volume — survives container restarts/removals
+volumes:
+  postgres_data:
+
+# internal network — all containers talk to each other by service name
+networks:
+  url-network:
+    driver: bridge
