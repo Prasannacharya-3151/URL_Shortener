@@ -1,7 +1,7 @@
 What we're building — URL Shortener
 POST /shorten        → send a long URL, get back a short code (e.g. abc123)
 GET  /:code          → visits the short URL → redirects to original long URL
-GET  /stats/:code    → see how many times that short URL was clicked (real-time counter)
+GET  /stats/:code    → see how many times that short URL was clicked (real-time counter).
 
 The real-time part you asked about: every time someone visits a short URL, Redis instantly increments a hit counter. You can hit /stats/:code and see live click counts updating in real time — that's Redis doing sub-millisecond reads/writes, way faster than Postgres for this use case.
 
